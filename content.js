@@ -391,10 +391,17 @@ class HallucinationLensContent {
       }
 
       console.log("응답 텍스트 처리 중...", text.substring(0, 100) + "...");
+      console.log("전체 텍스트 길이:", text.length);
 
       // 키워드 추출
       const keywords = HallucinationLensUtils.extractKeywords(text);
+      console.log("키워드 추출 결과:", keywords);
+
       if (keywords.length === 0) {
+        console.log(
+          "[HallucinationLens] 키워드가 추출되지 않았습니다. 텍스트 샘플:",
+          text.substring(0, 200)
+        );
         return;
       }
 
@@ -412,7 +419,15 @@ class HallucinationLensContent {
       );
 
       // 오버레이 생성
+      console.log("[HallucinationLens] 오버레이 생성 시작:", {
+        trustInfo,
+        searchResults,
+        keywords,
+      });
+
       this.createOverlay(element, trustInfo, searchResults, keywords);
+
+      console.log("[HallucinationLens] 오버레이 생성 완료");
     } catch (error) {
       console.error("응답 요소 처리 오류:", error);
     }
@@ -599,6 +614,39 @@ class HallucinationLensContent {
   }
 
   /**
+   * 테스트용 오버레이 생성 (디버깅용)
+   */
+  createTestOverlay() {
+    console.log("[HallucinationLens] 테스트 오버레이 생성 시작");
+
+    const testElement = document.querySelector("div");
+    if (!testElement) {
+      console.log("[HallucinationLens] 테스트할 요소를 찾을 수 없습니다");
+      return;
+    }
+
+    const testTrustInfo = {
+      score: "high",
+      label: "신뢰도: 높음 (테스트)",
+      reason: "테스트용 오버레이입니다.",
+      color: "#51cf66",
+    };
+
+    const testResults = [
+      {
+        title: "테스트 검색 결과",
+        url: "https://example.com",
+        snippet: "이것은 테스트용 검색 결과입니다.",
+      },
+    ];
+
+    const testKeywords = ["테스트", "키워드", "확인"];
+
+    this.createOverlay(testElement, testTrustInfo, testResults, testKeywords);
+    console.log("[HallucinationLens] 테스트 오버레이 생성 완료");
+  }
+
+  /**
    * 정리 함수
    */
   cleanup() {
@@ -615,9 +663,57 @@ class HallucinationLensContent {
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", () => {
     window.hallucinationLens = new HallucinationLensContent();
+
+    // 디버깅용 전역 함수 추가
+    window.testHallucinationLens = () => {
+      if (window.hallucinationLens) {
+        window.hallucinationLens.createTestOverlay();
+      }
+    };
+
+    window.debugHallucinationLens = () => {
+      if (window.hallucinationLens) {
+        console.log("=== HallucinationLens 디버그 정보 ===");
+        console.log("플랫폼:", window.hallucinationLens.platform);
+        console.log("활성화 상태:", window.hallucinationLens.isEnabled);
+        console.log(
+          "처리된 요소 수:",
+          window.hallucinationLens.processedElements.size
+        );
+        console.log("현재 페이지 URL:", window.location.href);
+
+        // 강제로 콘텐츠 처리 실행
+        console.log("강제 콘텐츠 처리 실행...");
+        window.hallucinationLens.processExistingContent();
+      }
+    };
   });
 } else {
   window.hallucinationLens = new HallucinationLensContent();
+
+  // 디버깅용 전역 함수 추가
+  window.testHallucinationLens = () => {
+    if (window.hallucinationLens) {
+      window.hallucinationLens.createTestOverlay();
+    }
+  };
+
+  window.debugHallucinationLens = () => {
+    if (window.hallucinationLens) {
+      console.log("=== HallucinationLens 디버그 정보 ===");
+      console.log("플랫폼:", window.hallucinationLens.platform);
+      console.log("활성화 상태:", window.hallucinationLens.isEnabled);
+      console.log(
+        "처리된 요소 수:",
+        window.hallucinationLens.processedElements.size
+      );
+      console.log("현재 페이지 URL:", window.location.href);
+
+      // 강제로 콘텐츠 처리 실행
+      console.log("강제 콘텐츠 처리 실행...");
+      window.hallucinationLens.processExistingContent();
+    }
+  };
 }
 
 // 페이지 언로드 시 정리

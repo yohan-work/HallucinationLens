@@ -10,7 +10,17 @@ class HallucinationLensUtils {
    * @returns {string[]} - 추출된 키워드 배열
    */
   static extractKeywords(text) {
-    if (!text || typeof text !== "string") return [];
+    if (!text || typeof text !== "string") {
+      console.log(
+        "[HallucinationLens] 키워드 추출 실패: 텍스트가 없거나 문자열이 아님"
+      );
+      return [];
+    }
+
+    console.log(
+      "[HallucinationLens] 키워드 추출 시작, 원본 텍스트 길이:",
+      text.length
+    );
 
     // 기본적인 전처리
     const cleanText = text
@@ -18,6 +28,11 @@ class HallucinationLensUtils {
       .replace(/[^\w\s가-힣]/g, " ") // 특수문자 제거
       .replace(/\s+/g, " ")
       .trim();
+
+    console.log(
+      "[HallucinationLens] 전처리된 텍스트:",
+      cleanText.substring(0, 200) + "..."
+    );
 
     // 불용어 목록 (한국어 + 영어)
     const stopWords = new Set([
@@ -116,6 +131,12 @@ class HallucinationLensUtils {
       .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([word]) => word);
+
+    console.log("[HallucinationLens] 최종 키워드 추출 결과:", keywords);
+    console.log(
+      "[HallucinationLens] 단어 빈도수:",
+      Object.entries(wordFreq).slice(0, 10)
+    );
 
     return keywords;
   }
