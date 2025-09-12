@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HallucinationLens</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      min-height: 400px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #333;
+    }
+
+    .container {
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: #4c51bf;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .logo::before {
+      content: '🔍';
+      font-size: 20px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+
+    .content {
+      flex: 1;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(10px);
+    }
+
+    .status-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .status-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background: #d1d5db;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    .toggle-switch.active {
+      background: #10b981;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    .status-info {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+
+    .platform-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 8px 12px;
+      background: #f3f4f6;
+      border-radius: 8px;
+    }
+
+    .platform-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+    }
+
+    .platform-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: #374151;
+    }
+
+    .features-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .features-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 12px;
+    }
+
+    .feature-list {
+      list-style: none;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.4;
+    }
+
+    .feature-item::before {
+      content: '✓';
+      color: #10b981;
+      font-weight: bold;
+      margin-top: 1px;
+    }
+
+    .footer {
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-top: 1px solid rgba(255, 255, 255, 0.2);
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .footer-link {
+      font-size: 11px;
+      color: #4c51bf;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .footer-link:hover {
+      text-decoration: underline;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .loading::before {
+      content: '';
+      width: 12px;
+      height: 12px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #4c51bf;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .error {
+      color: #dc2626;
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
+      background: #fef2f2;
+      border-radius: 6px;
+      border: 1px solid #fecaca;
+    }
+
+    .success {
+      color: #059669;
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
+      background: #ecfdf5;
+      border-radius: 6px;
+      border: 1px solid #a7f3d0;
+    }
+
+    /* 다크 모드 지원 */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+      }
+
+      .header,
+      .content,
+      .footer {
+        background: rgba(31, 41, 55, 0.95);
+      }
+
+      .status-card,
+      .features-card {
+        background: #374151;
+        border-color: #4b5563;
+      }
+
+      .status-title,
+      .features-title,
+      .platform-name {
+        color: #f3f4f6;
+      }
+
+      .status-info,
+      .feature-item,
+      .footer-text {
+        color: #d1d5db;
+      }
+
+      .platform-info {
+        background: #4b5563;
+      }
+
+      .error {
+        background: #7f1d1d;
+        border-color: #dc2626;
+        color: #fca5a5;
+      }
+
+      .success {
+        background: #064e3b;
+        border-color: #059669;
+        color: #6ee7b7;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">HallucinationLens</div>
+      <div class="subtitle">AI 답변 신뢰도 검증 도구</div>
+    </div>
+
+    <div class="content">
+      <div class="status-card">
+        <div class="status-header">
+          <div class="status-title">확장 프로그램 상태</div>
+          <div class="toggle-switch" id="toggleSwitch">
+          </div>
+        </div>
+        <div class="status-info" id="statusInfo">
+          <div class="loading">상태 확인 중...</div>
+        </div>
+        <div class="platform-info" id="platformInfo" style="display: none;">
+          <div class="platform-icon" id="platformIcon"></div>
+          <div class="platform-name" id="platformName">플랫폼 감지 중...</div>
+        </div>
+      </div>
+
+      <div class="features-card">
+        <div class="features-title">주요 기능</div>
+        <ul class="feature-list">
+          <li class="feature-item">AI 답변 자동 감지 및 분석</li>
+          <li class="feature-item">키워드 기반 실시간 팩트체킹</li>
+          <li class="feature-item">DuckDuckGo 검색 결과 제공</li>
+          <li class="feature-item">신뢰도 점수 표시</li>
+          <li class="feature-item">ChatGPT, Claude, Gemini 지원</li>
+        </ul>
+      </div>
+
+      <div id="messageArea"></div>
+    </div>
+
+    <div class="footer">
+      <div class="footer-text">무료 오픈소스 프로젝트</div>
+      <div class="footer-links">
+        <a href="#" class="footer-link" id="helpLink">도움말</a>
+        <a href="#" class="footer-link" id="feedbackLink">피드백</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
