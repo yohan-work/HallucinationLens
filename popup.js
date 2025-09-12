@@ -76,11 +76,18 @@ class HallucinationLensPopup {
 
       // 지원되는 플랫폼인지 확인
       if (tab && tab.url) {
-        if (tab.url.includes("chat.openai.com")) {
+        if (
+          tab.url.includes("chat.openai.com") ||
+          tab.url.includes("chatgpt.com")
+        ) {
           this.currentPlatform = "chatgpt";
         } else if (tab.url.includes("claude.ai")) {
           this.currentPlatform = "claude";
-        } else if (tab.url.includes("gemini.google.com")) {
+        } else if (
+          tab.url.includes("gemini.google.com") ||
+          tab.url.includes("gemini") ||
+          tab.url.includes("bard.google.com")
+        ) {
           this.currentPlatform = "gemini";
         }
       }
@@ -293,10 +300,65 @@ class HallucinationLensPopup {
           <li class="feature-item">관련 검색 결과와 신뢰도를 답변 아래에 표시합니다</li>
           <li class="feature-item">토글 버튼으로 언제든지 활성화/비활성화할 수 있습니다</li>
         </ul>
+        <div class="features-title" style="margin-top: 16px;">디버깅</div>
+        <button id="debugBtn" style="width: 100%; padding: 8px; background: #4c51bf; color: white; border: none; border-radius: 4px; cursor: pointer;">
+          콘솔 로그 확인하기
+        </button>
       </div>
     `;
 
     this.messageArea.innerHTML = helpText;
+
+    // 디버그 버튼 이벤트 추가
+    const debugBtn = document.getElementById("debugBtn");
+    if (debugBtn) {
+      debugBtn.addEventListener("click", () => this.showDebugInfo());
+    }
+  }
+
+  /**
+   * 디버그 정보 표시
+   */
+  async showDebugInfo() {
+    if (!this.currentTab || !this.currentPlatform) {
+      this.showError("현재 탭에서 디버그 정보를 가져올 수 없습니다.");
+      return;
+    }
+
+    try {
+      // Content script에서 디버그 정보 요청
+      const response = await chrome.tabs.sendMessage(this.currentTab.id, {
+        action: "getDebugInfo",
+      });
+
+      const debugText = `
+        <div class="features-card">
+          <div class="features-title">디버그 정보</div>
+          <div class="status-info" style="font-family: monospace; font-size: 11px;">
+            <strong>플랫폼:</strong> ${this.currentPlatform}<br>
+            <strong>URL:</strong> ${this.currentTab.url}<br>
+            <strong>활성화:</strong> ${this.isEnabled ? "예" : "아니오"}<br><br>
+            
+            <strong>콘솔 확인 방법:</strong><br>
+            1. F12 키를 눌러 개발자 도구를 엽니다<br>
+            2. Console 탭을 클릭합니다<br>
+            3. "[HallucinationLens]"로 시작하는 로그를 확인합니다<br><br>
+            
+            <strong>문제 해결:</strong><br>
+            • 페이지를 새로고침해보세요<br>
+            • 확장 프로그램을 껐다 켜보세요<br>
+            • AI 답변이 완전히 생성된 후 잠시 기다려보세요
+          </div>
+        </div>
+      `;
+
+      this.messageArea.innerHTML = debugText;
+    } catch (error) {
+      console.error("디버그 정보 가져오기 실패:", error);
+      this.showError(
+        "디버그 정보를 가져올 수 없습니다. 페이지를 새로고침해보세요."
+      );
+    }
   }
 
   /**
