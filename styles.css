@@ -281,7 +281,21 @@
 
 /* 플랫폼별 스타일 조정 */
 .hallucination-lens-overlay[data-platform="chatgpt"] {
-  margin: 16px 0;
+  margin: 16px 0 24px 0;
+  max-width: 100%;
+  /* ChatGPT의 메시지 너비에 맞춤 */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ChatGPT 특화: 메시지 컨테이너 내부에서 적절한 간격 유지 */
+.hallucination-lens-overlay[data-platform="chatgpt"] .hl-header {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-bottom: 1px solid #0ea5e9;
+}
+
+.hallucination-lens-overlay[data-platform="chatgpt"] .hl-trust-indicator {
+  font-size: 13px;
 }
 
 .hallucination-lens-overlay[data-platform="claude"] {
@@ -368,6 +382,40 @@
   
   .hl-result-item {
     border-width: 2px;
+  }
+}
+
+/* ChatGPT 레이아웃 깨짐 방지 */
+.hallucination-lens-overlay[data-platform="chatgpt"] {
+  /* 플렉스 레이아웃 깨짐 방지 */
+  flex-shrink: 0;
+  align-self: stretch;
+  
+  /* 컨테이너 내부에서 적절한 위치 유지 */
+  clear: both;
+  display: block;
+  
+  /* 하단 여백 확보로 깨진 것처럼 보이는 문제 해결 */
+  margin-bottom: 20px;
+  
+  /* 부모 컨테이너의 스타일 상속 방지 */
+  position: static;
+  transform: none;
+  
+  /* 최소 높이 설정으로 레이아웃 안정성 확보 */
+  min-height: 60px;
+}
+
+/* ChatGPT 메시지 컨테이너와의 조화 */
+.hallucination-lens-overlay[data-platform="chatgpt"]:not(:last-child) {
+  margin-bottom: 16px;
+}
+
+/* ChatGPT 다크모드 대응 */
+@media (prefers-color-scheme: dark) {
+  .hallucination-lens-overlay[data-platform="chatgpt"] .hl-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+    border-bottom-color: #3b82f6;
   }
 }
 

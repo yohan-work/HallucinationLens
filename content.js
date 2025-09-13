@@ -136,22 +136,27 @@ class HallucinationLensContent {
     switch (this.platform) {
       case "chatgpt":
         selectors = [
-          // 최신 ChatGPT 선택자들
-          '[data-message-author-role="assistant"]',
           '[data-message-author-role="assistant"] .markdown',
-          '[data-message-author-role="assistant"] div',
-          ".group\\/conversation-turn .markdown",
-          '[data-testid="conversation-turn-3"] .markdown',
-          '[data-testid*="conversation-turn"] [data-message-author-role="assistant"]',
+          '[data-message-author-role="assistant"] > div > div',
+          '[data-message-author-role="assistant"] div[class*="markdown"]',
 
-          // 추가 선택자들
+          // ChatGPT 구조
+          '.group\\/conversation-turn[data-testid*="conversation-turn"] [data-message-author-role="assistant"]',
+          ".group\\/conversation-turn .prose",
+          ".group\\/conversation-turn .markdown",
+
+          // 메시지 컨테이너
+          '[data-testid*="conversation-turn"] [data-message-author-role="assistant"] .prose',
+          '[data-testid*="conversation-turn"] [data-message-author-role="assistant"] .markdown',
+          '[data-testid*="conversation-turn"] [data-message-author-role="assistant"] > div',
+
+          // 기존 선택자들 (호환성)
+          '[data-message-author-role="assistant"]',
           ".prose",
           ".markdown.prose",
           ".message-content",
-          '[class*="ConversationItem"] [data-message-author-role="assistant"]',
-          '[class*="Message"][class*="assistant"]',
 
-          // 더 일반적인 선택자들
+          // 범용 선택자들 (낮은 우선순위)
           "div[data-message-id]",
           ".conversation-content div",
           '[role="presentation"] div',
@@ -261,7 +266,13 @@ class HallucinationLensContent {
     console.log("[HallucinationLens] 범용 감지 시작");
 
     const fallbackSelectors = [
-      // ChatGPT 특화 선택자들
+      // ChatGPT 2024 최신 구조 특화 선택자들
+      'div[data-testid*="conversation-turn"] div[data-message-author-role="assistant"]',
+      '.group\\/conversation-turn div[data-message-author-role="assistant"]',
+      'div[data-message-author-role="assistant"] .prose',
+      'div[data-message-author-role="assistant"] .markdown',
+
+      // 기존 ChatGPT 선택자들
       "div[data-message-id]",
       "div[data-message-author-role]",
       'div[data-testid*="conversation"]',
@@ -276,12 +287,13 @@ class HallucinationLensContent {
       '[class*="generated"]',
       '[class*="output"]',
 
-      // 구조적 패턴
+      // 구조적 패턴 (ChatGPT 우선)
+      '.group div:not([class*="user"]):not([class*="human"])',
       'div[role="presentation"] div',
       "div[data-testid] div",
       "div[data-test-id] div",
 
-      // 텍스트가 많은 div 요소들
+      // 텍스트가 많은 div 요소들 (낮은 우선순위)
       'div:not([class*="input"]):not([class*="user"]):not([class*="human"])',
     ];
 
@@ -564,30 +576,143 @@ class HallucinationLensContent {
    * @param {Element} overlay - 오버레이 요소
    */
   insertOverlay(targetElement, overlay) {
-    // 플랫폼별 삽입 위치 조정
-    let insertTarget = targetElement.parentNode;
+    let insertTarget = targetElement;
+    let insertPosition = "after"; // "after", "inside", "before"
 
-    // 더 적절한 부모 요소 찾기
-    let current = targetElement;
-    for (let i = 0; i < 3; i++) {
+    // 플랫폼별 삽입 전략
+    if (this.platform === "chatgpt") {
+      // ChatGPT의 경우 메시지 컨테이너를 찾아서 그 다음에 삽입
+      let messageContainer = this.findChatGPTMessageContainer(targetElement);
+      if (messageContainer) {
+        insertTarget = messageContainer;
+        insertPosition = "after";
+      } else {
+        // 대안: 가장 가까운 적절한 부모 요소 찾기
+        insertTarget = this.findAppropriateParent(targetElement);
+        insertPosition = "after";
+      }
+    } else {
+      // 다른 플랫폼의 경우 기존 로직 사용
+      insertTarget = this.findAppropriateParent(targetElement);
+      insertPosition = "after";
+    }
+
+    // 실제 삽입 실행
+    this.performInsertion(insertTarget, overlay, insertPosition);
+  }
+
+  /**
+   * ChatGPT 메시지 컨테이너 찾기
+   * @param {Element} element - 시작 요소
+   * @returns {Element|null} - 메시지 컨테이너 또는 null
+   */
+  findChatGPTMessageContainer(element) {
+    let current = element;
+
+    // 최대 5단계까지 부모 요소를 탐색
+    for (let i = 0; i < 5 && current && current !== document.body; i++) {
+      // ChatGPT의 메시지 컨테이너 패턴 확인
+      if (
+        current.hasAttribute("data-testid") &&
+        current.getAttribute("data-testid").includes("conversation-turn")
+      ) {
+        return current;
+      }
+
+      // group 클래스를 가진 conversation-turn 컨테이너
+      if (
+        current.classList.contains("group") &&
+        (current.className.includes("conversation-turn") ||
+          current.querySelector('[data-message-author-role="assistant"]'))
+      ) {
+        return current;
+      }
+
+      // data-message-author-role이 있는 직접 부모
+      if (current.hasAttribute("data-message-author-role")) {
+        return current.parentElement || current;
+      }
+
+      current = current.parentElement;
+    }
+
+    return null;
+  }
+
+  /**
+   * 적절한 부모 요소 찾기 (범용)
+   * @param {Element} element - 시작 요소
+   * @returns {Element} - 적절한 부모 요소
+   */
+  findAppropriateParent(element) {
+    let current = element;
+
+    for (let i = 0; i < 4 && current && current !== document.body; i++) {
       if (current.parentNode && current.parentNode !== document.body) {
         current = current.parentNode;
+
+        // 적절한 컨테이너 클래스 확인
         if (
           current.classList.contains("group") ||
           current.classList.contains("message") ||
-          current.classList.contains("conversation-turn")
+          current.classList.contains("conversation-turn") ||
+          current.hasAttribute("data-testid") ||
+          current.hasAttribute("data-message-id")
         ) {
-          insertTarget = current;
-          break;
+          return current;
         }
       }
     }
 
-    // 오버레이 삽입
-    if (insertTarget.nextSibling) {
-      insertTarget.parentNode.insertBefore(overlay, insertTarget.nextSibling);
-    } else {
-      insertTarget.parentNode.appendChild(overlay);
+    return element.parentNode || element;
+  }
+
+  /**
+   * 실제 삽입 수행
+   * @param {Element} target - 삽입 대상
+   * @param {Element} overlay - 오버레이 요소
+   * @param {string} position - 삽입 위치
+   */
+  performInsertion(target, overlay, position) {
+    try {
+      switch (position) {
+        case "after":
+          if (target.nextSibling) {
+            target.parentNode.insertBefore(overlay, target.nextSibling);
+          } else {
+            target.parentNode.appendChild(overlay);
+          }
+          break;
+
+        case "before":
+          target.parentNode.insertBefore(overlay, target);
+          break;
+
+        case "inside":
+          target.appendChild(overlay);
+          break;
+
+        default:
+          // 기본값: after
+          if (target.nextSibling) {
+            target.parentNode.insertBefore(overlay, target.nextSibling);
+          } else {
+            target.parentNode.appendChild(overlay);
+          }
+      }
+
+      console.log(`[HallucinationLens] 오버레이 삽입 완료: ${position} 위치`);
+    } catch (error) {
+      console.error("[HallucinationLens] 오버레이 삽입 실패:", error);
+
+      // 실패 시 대안: 타겟 요소 다음에 강제 삽입
+      try {
+        if (target.parentNode) {
+          target.parentNode.appendChild(overlay);
+        }
+      } catch (fallbackError) {
+        console.error("[HallucinationLens] 대안 삽입도 실패:", fallbackError);
+      }
     }
   }
 
