@@ -142,7 +142,7 @@ class HallucinationLensUtils {
   }
 
   /**
-   * 검색을 수행하는 함수 (실용적 접근)
+   * 검색을 수행하는 함수 (Background Script 사용)
    * @param {string[]} keywords - 검색할 키워드 배열
    * @returns {Promise<Object[]>} - 검색 결과 배열
    */
@@ -155,16 +155,69 @@ class HallucinationLensUtils {
       // 키워드를 조합하여 검색 쿼리 생성
       const query = keywords.slice(0, 3).join(" "); // 상위 3개 키워드만 사용
 
-      // 실제 검색 대신 키워드 기반 신뢰도 평가를 위한 모의 결과 생성
-      const mockResults = await this.generateMockSearchResults(keywords, query);
+      // Background Script를 통한 검색 시도
+      const realResults = await this.searchViaBackground(query);
 
-      console.log("[HallucinationLens] 생성된 검색 결과:", mockResults);
+      if (realResults && realResults.length > 0) {
+        console.log("[HallucinationLens] Background 검색 결과:", realResults);
+        return realResults;
+      }
+
+      // Background 검색 실패 시 키워드 기반 분석으로 대체
+      const mockResults = await this.generateMockSearchResults(keywords, query);
+      console.log("[HallucinationLens] 모의 검색 결과:", mockResults);
 
       return mockResults;
     } catch (error) {
       console.error("검색 오류:", error);
-      return [];
+      // 오류 시에도 키워드 기반 분석 제공
+      return await this.generateMockSearchResults(keywords, keywords.join(" "));
     }
+  }
+
+  /**
+   * Background Script를 통한 검색
+   * @param {string} query - 검색 쿼리
+   * @returns {Promise<Object[]>} - 검색 결과 배열
+   */
+  static async searchViaBackground(query) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { action: "search", query: query },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[HallucinationLens] Background 통신 오류:",
+                chrome.runtime.lastError
+              );
+              resolve([]);
+              return;
+            }
+
+            if (response && response.success && response.results) {
+              console.log(
+                "[HallucinationLens] Background 검색 성공:",
+                response.results
+              );
+              resolve(response.results);
+            } else {
+              console.warn(
+                "[HallucinationLens] Background 검색 실패:",
+                response
+              );
+              resolve([]);
+            }
+          }
+        );
+      } catch (error) {
+        console.error(
+          "[HallucinationLens] Background 메시지 전송 오류:",
+          error
+        );
+        resolve([]);
+      }
+    });
   }
 
   /**
@@ -434,24 +487,134 @@ class HallucinationLensUtils {
   }
 
   /**
-   * 대체 검색 방법 (DuckDuckGo HTML 스크래핑)
+   * 실제 DuckDuckGo Instant Answer API 검색
+   * @param {string} query - 검색 쿼리
+   * @returns {Promise<Object[]>} - 검색 결과 배열
+   */
+  static async performRealSearch(query) {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+      const apiUrl = `https://api.duckduckgo.com/?q=${encodedQuery}&format=json&no_html=1&skip_disambig=1`;
+
+      console.log("[HallucinationLens] DuckDuckGo API 호출:", apiUrl);
+
+      const response = await fetch(apiUrl);
+      const data = await response.json();
+
+      const results = [];
+
+      // Abstract (요약 정보)
+      if (data.Abstract && data.Abstract.trim()) {
+        results.push({
+          title: data.Heading || "정보 요약",
+          url: data.AbstractURL || "#",
+          snippet: data.Abstract,
+          isReliable: true,
+          source: "DuckDuckGo",
+        });
+      }
+
+      // Related Topics (관련 주제)
+      if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+        data.RelatedTopics.slice(0, 2).forEach((topic) => {
+          if (topic.Text && topic.FirstURL) {
+            results.push({
+              title: topic.Text.split(" - ")[0] || "관련 주제",
+              url: topic.FirstURL,
+              snippet: topic.Text,
+              isReliable: true,
+              source: "DuckDuckGo",
+            });
+          }
+        });
+      }
+
+      // Answer (직접 답변)
+      if (data.Answer && data.Answer.trim()) {
+        results.push({
+          title: "직접 답변",
+          url: data.AnswerURL || "#",
+          snippet: data.Answer,
+          isReliable: true,
+          source: "DuckDuckGo",
+        });
+      }
+
+      console.log("[HallucinationLens] DuckDuckGo API 결과:", results);
+      return results;
+    } catch (error) {
+      console.error("[HallucinationLens] DuckDuckGo API 오류:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Wikipedia API 검색
+   * @param {string} query - 검색 쿼리
+   * @returns {Promise<Object[]>} - 검색 결과 배열
+   */
+  static async searchWikipedia(query) {
+    try {
+      const encodedQuery = encodeURIComponent(query);
+
+      // 먼저 검색으로 관련 페이지 찾기
+      const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/search/${encodedQuery}`;
+      const searchResponse = await fetch(searchUrl);
+      const searchData = await searchResponse.json();
+
+      if (!searchData.pages || searchData.pages.length === 0) {
+        return [];
+      }
+
+      const results = [];
+
+      // 상위 2개 결과에 대해 요약 정보 가져오기
+      for (let i = 0; i < Math.min(2, searchData.pages.length); i++) {
+        const page = searchData.pages[i];
+        try {
+          const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+            page.key
+          )}`;
+          const summaryResponse = await fetch(summaryUrl);
+          const summaryData = await summaryResponse.json();
+
+          if (summaryData.extract) {
+            results.push({
+              title: summaryData.title,
+              url:
+                summaryData.content_urls?.desktop?.page ||
+                `https://en.wikipedia.org/wiki/${page.key}`,
+              snippet: summaryData.extract,
+              isReliable: true,
+              source: "Wikipedia",
+            });
+          }
+        } catch (summaryError) {
+          console.warn(
+            "[HallucinationLens] Wikipedia 요약 가져오기 실패:",
+            summaryError
+          );
+        }
+      }
+
+      console.log("[HallucinationLens] Wikipedia API 결과:", results);
+      return results;
+    } catch (error) {
+      console.error("[HallucinationLens] Wikipedia API 오류:", error);
+      return [];
+    }
+  }
+
+  /**
+   * 대체 검색 방법 (기존 키워드 기반 분석)
    * @param {string} query - 검색 쿼리
    * @returns {Promise<Object[]>} - 검색 결과 배열
    */
   static async fallbackSearch(query) {
     try {
-      const encodedQuery = encodeURIComponent(query);
-      const searchUrl = `https://duckduckgo.com/html/?q=${encodedQuery}`;
-
-      // CORS 문제로 인해 실제 스크래핑은 제한적
-      // 대신 더미 데이터로 신뢰도 평가를 위한 기본 결과 제공
-      return [
-        {
-          title: "검색 결과를 찾을 수 없음",
-          url: "#",
-          snippet: "해당 키워드에 대한 구체적인 검색 결과를 찾을 수 없습니다.",
-        },
-      ];
+      // 키워드 기반 분석으로 대체
+      const keywords = this.extractKeywords(query);
+      return await this.generateMockSearchResults(keywords, query);
     } catch (error) {
       console.error("대체 검색 오류:", error);
       return [];
@@ -512,6 +675,15 @@ class HallucinationLensUtils {
       (result) => result.isReliable === false
     );
 
+    // 실제 검색 결과 소스 분석
+    const hasWikipediaResults = searchResults.some(
+      (result) => result.source === "Wikipedia"
+    );
+    const hasDuckDuckGoResults = searchResults.some(
+      (result) => result.source === "DuckDuckGo"
+    );
+    const hasRealSearchResults = hasWikipediaResults || hasDuckDuckGoResults;
+
     // 신뢰할 수 없는 결과만 있는 경우
     if (reliableResults.length === 0 && unreliableResults.length > 0) {
       return {
@@ -524,13 +696,29 @@ class HallucinationLensUtils {
 
     // 신뢰할 수 있는 결과가 있는 경우
     if (reliableResults.length > 0) {
-      // 키워드 품질에 따른 추가 평가
-      if (keywordAnalysis.isHighQuality) {
+      // 실제 검색 결과가 있는 경우 더 높은 신뢰도
+      if (hasRealSearchResults) {
+        const sources = [];
+        if (hasWikipediaResults) sources.push("Wikipedia");
+        if (hasDuckDuckGoResults) sources.push("DuckDuckGo");
+
         return {
           score: "high",
           label: "신뢰도: 높음",
-          reason: `${reliableResults.length}개의 관련 자료를 찾았습니다. 구체적인 키워드로 검증 가능합니다.`,
+          reason: `${sources.join(", ")}에서 ${
+            reliableResults.length
+          }개의 관련 자료를 찾았습니다.`,
           color: "#51cf66",
+        };
+      }
+
+      // 키워드 기반 분석 결과만 있는 경우
+      if (keywordAnalysis.isHighQuality) {
+        return {
+          score: "medium",
+          label: "신뢰도: 보통",
+          reason: `구체적인 키워드가 포함되어 있지만 외부 검증이 제한적입니다.`,
+          color: "#ffd43b",
         };
       } else {
         return {

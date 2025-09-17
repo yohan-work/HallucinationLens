@@ -173,8 +173,23 @@ class HallucinationLensContent {
 
       case "gemini":
         selectors = [
+          // Gemini 선택자들 (우선순위 높음)
+          '[data-test-id="model-response-text"]',
+          '[data-testid="model-response-text"]',
           ".model-response-text",
+          '[role="presentation"] [data-test-id="model-response-text"]',
+
+          // Gemini 메시지 컨테이너
+          '[data-test-id="conversation-turn"] .model-response',
+          '[data-testid="conversation-turn"] .model-response',
+          ".conversation-turn .model-response",
+
+          // 응답 텍스트 영역
           ".response-container .markdown",
+          ".response-container div[data-test-id]",
+          ".response-container div[data-testid]",
+
+          // 일반적인 Gemini 패턴
           '[data-test-id="model-response"] .markdown',
           '[data-testid="model-response"]',
           ".markdown.prose",
@@ -184,12 +199,18 @@ class HallucinationLensContent {
           ".message-content",
           ".model-response",
           ".response-text",
-          // 더 일반적인 선택자들 추가
+
+          // 더 일반적인 선택자들
           "div[data-response-id]",
           ".response",
           '[class*="response"]',
           '[class*="message"][class*="assistant"]',
           '[class*="model"]',
+
+          // 범용 텍스트 컨테이너 (낮은 우선순위)
+          'div[role="presentation"] div',
+          "div[data-test-id] div",
+          "div[data-testid] div",
         ];
         break;
     }
@@ -230,6 +251,30 @@ class HallucinationLensContent {
       console.log(
         `[HallucinationLens] 요소를 찾을 수 없습니다. 페이지의 모든 텍스트 요소를 확인합니다...`
       );
+
+      // 현재 페이지의 구조 분석
+      console.log(`[HallucinationLens] 현재 URL: ${window.location.href}`);
+      console.log(`[HallucinationLens] 플랫폼: ${this.platform}`);
+
+      // 특정 속성을 가진 요소들 확인
+      const dataTestElements = document.querySelectorAll(
+        "[data-test-id], [data-testid]"
+      );
+      console.log(
+        `[HallucinationLens] data-test-id/data-testid 요소 ${dataTestElements.length}개 발견`
+      );
+      dataTestElements.slice(0, 5).forEach((el, i) => {
+        console.log(
+          `[HallucinationLens] data 요소 ${i + 1}: ${
+            el.tagName
+          } - data-test-id="${el.getAttribute(
+            "data-test-id"
+          )}" data-testid="${el.getAttribute(
+            "data-testid"
+          )}" - "${el.textContent?.substring(0, 50)}..."`
+        );
+      });
+
       const allTextElements = document.querySelectorAll("div, p, span");
       const longTextElements = Array.from(allTextElements).filter(
         (el) => el.textContent && el.textContent.trim().length > 100
@@ -253,6 +298,18 @@ class HallucinationLensContent {
         );
         return fallbackElements;
       }
+    } else {
+      // 성공적으로 요소를 찾은 경우 정보 출력
+      console.log(
+        `[HallucinationLens] 성공적으로 ${filteredElements.length}개 요소 발견:`
+      );
+      filteredElements.slice(0, 3).forEach((el, i) => {
+        console.log(
+          `[HallucinationLens] 발견된 요소 ${i + 1}: ${el.tagName}.${
+            el.className
+          } - "${el.textContent?.substring(0, 50)}..."`
+        );
+      });
     }
 
     return filteredElements;
@@ -266,7 +323,7 @@ class HallucinationLensContent {
     console.log("[HallucinationLens] 범용 감지 시작");
 
     const fallbackSelectors = [
-      // ChatGPT 2024 최신 구조 특화 선택자들
+      // ChatGPT 특화 선택자들
       'div[data-testid*="conversation-turn"] div[data-message-author-role="assistant"]',
       '.group\\/conversation-turn div[data-message-author-role="assistant"]',
       'div[data-message-author-role="assistant"] .prose',
